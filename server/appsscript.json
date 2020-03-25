@@ -1,8 +1,5 @@
 {
-    "timeZone": "America/New_York",
-    "dependencies": {},
-    "oauthScopes": [
-      "https://www.googleapis.com/auth/spreadsheets",
-    ]
-  }
-  
+  "timeZone": "America/New_York",
+  "dependencies": {},
+  "oauthScopes": ["https://www.googleapis.com/auth/spreadsheets"]
+}

@@ -1,0 +1,15 @@
+{
+  "timeZone": "America/Santiago",
+  "dependencies": {
+  },
+  "exceptionLogging": "STACKDRIVER",
+  "sheets": {
+    "macros": [{
+      "menuName": "PegarDatosForm1",
+      "functionName": "PegarDatosForm2"
+    }, {
+      "menuName": "PegarDatosForm01",
+      "functionName": "PegarDatosForm01"
+    }]
+  }
+}

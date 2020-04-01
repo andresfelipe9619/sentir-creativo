@@ -1,10 +1,10 @@
 exports = async function hook(payload) {
+  console.log("PAYLOAD ==>", stringify(payload));
   const atlas = context.services.get("mongodb-atlas");
   const eventsdb = atlas.db("stoner-cluster");
   const mongoService = initMongoService(eventsdb);
-  const { action, data } = payload.body;
-  console.log("PAYLOAD ==>", stringify(payload));
-  const result = handleAction(mongoService, { action, data });
+  const { action, data } = payload.query || {};
+  const result = await handleAction(mongoService, { action, data });
   return result;
 };
 
@@ -15,23 +15,24 @@ function stringify(data) {
 async function handleAction(mongoService, { action, data }) {
   let result = { data: null, message: "Could not execute action" };
   console.log("ACTION ==>", action);
+  console.log("DATA ==>", stringify(data));
   if (action === "read") {
-    result = await mongoService.getServices();
+    result = await mongoService.getOrders();
   }
   if (action === "search") {
-    result = await mongoService.searchService();
+    result = await mongoService.searchOrder();
   }
   if (action === "latest") {
-    result = await mongoService.getLatestServices();
+    result = await mongoService.getLatestOrders();
   }
   if (action === "create") {
-    result = await mongoService.createService();
+    result = await mongoService.createOrder();
   }
   if (action === "update") {
-    result = await mongoService.updateService();
+    result = await mongoService.updateOrder();
   }
   if (action === "delete") {
-    result = await mongoService.deleteService(data);
+    result = await mongoService.deleteOrder(data);
   }
   console.log("RESULT ==>", stringify(result));
   return result;
@@ -39,31 +40,31 @@ async function handleAction(mongoService, { action, data }) {
 
 function initMongoService(eventsdb) {
   // ============== Servicios para la coleccion de servicios ==============
-  function getLatestServices() {
+  function getLatestOrders() {
     const limit = 4;
-    return getServices({ limit });
+    return getOrders({ limit });
   }
 
-  function searchService(query) {
+  function searchOrder(query) {
     return findOneDocument(query);
   }
 
-  function getServices(options) {
+  function getOrders(options) {
     return findDocuments({ collection: "services", ...options });
   }
 
-  function deleteService({ id }) {
+  function deleteOrder({ id }) {
     const { deletedCount } = deleteDocument({ collection: "services", id });
     let result = { message: "Service deleted correctly", data: null };
     if (!deletedCount) result.message = "Looks like the service does not exist";
     return result;
   }
 
-  function createService(options) {
+  function createOrder(options) {
     return createDocument({ collection: "services", ...options });
   }
 
-  function updateService(options) {
+  function updateOrder(options) {
     return updateDocument({ collection: "services", ...options });
   }
 
@@ -85,8 +86,17 @@ function initMongoService(eventsdb) {
   function findDocuments({ collection, query = {}, limit }) {
     const collectionService = eventsdb.collection(collection);
     return collectionService
-      .find(query)
-      .limit(limit || 20)
+      .aggregate([
+        {
+          $lookup: {
+            from: "client",
+            localField: "clienteId",
+            foreignField: "_id",
+            as: "cliente"
+          }
+        },
+        { $limit: limit || 20 }
+      ])
       .toArray();
   }
 
@@ -99,11 +109,11 @@ function initMongoService(eventsdb) {
 
   // ============== Fin CRUD generico ==============
   return {
-    getServices,
-    deleteService,
-    searchService,
-    createService,
-    updateService,
-    getLatestServices
+    getOrders,
+    deleteOrder,
+    searchOrder,
+    createOrder,
+    updateOrder,
+    getLatestOrders
   };
 }

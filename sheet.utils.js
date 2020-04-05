@@ -1,7 +1,15 @@
 function camelCaseToWords(string) {
   return (string.match(/^[a-z]+|[A-Z][a-z]*/g) || [])
-    .map(x => x[0].toUpperCase() + x.substr(1).toLowerCase())
+    .map((x) => x[0].toUpperCase() + x.substr(1).toLowerCase())
     .join(" ");
+}
+
+function wordToCamelCase(string) {
+  return string
+    .replace(/(?:^\w|[A-Z]|\b\w)/g, function (word, index) {
+      return index == 0 ? word.toLowerCase() : word.toUpperCase();
+    })
+    .replace(/\s+/g, "");
 }
 
 function findText({ sheet, text }) {
@@ -22,22 +30,22 @@ function showErrorMessage(body) {
   showMessage("Error", body);
 }
 
-function showAlert({ onAccepted, onDenied }) {
+function showAlert({ title, onAccepted = () => {}, onDenied = () => {} }) {
   let ui = SpreadsheetApp.getUi(); // Same variations.
 
   let result = ui.alert(
-    "Por favor confirma",
-    "Estas segur que quieres continuar?",
+    title || "Por favor confirma",
+    "Estás seguro que quieres continuar?",
     ui.ButtonSet.YES_NO
   );
   // Process the user's response.
   if (result == ui.Button.YES) {
     // User clicked "Yes".
-    ui.alert("Confirmation received.");
+    ui.alert("Acción recibida");
     onAccepted();
   } else {
     // User clicked "No" or X in the title bar.
-    ui.alert("Permission denied.");
+    ui.alert("Acción cancelada");
     onDenied();
   }
 }
@@ -47,20 +55,15 @@ function showMessage(title, body = "") {
   Browser.msgBox(title, body, Browser.Buttons.OK);
 }
 
-function sheetValuesToObject(sheetValues, headers) {
-  let headings =
-    headers[0].map(v => v.toLowerCase()) ||
-    sheetValues[0].map(v => v.toLowerCase());
-  let people = sheetValues;
-  if (sheetValues.length > 1) people = sheetValues.slice(1);
-
-  let peopleWithHeadings = addHeadings(people, headings);
-
+function sheetValuesToObject({ sheetValues, headers }) {
+  let headings = headers.map((v) => wordToCamelCase(String(v)));
+  console.log("headings", headings);
+  let peopleWithHeadings = addHeadings(sheetValues, headings);
   function addHeadings(people, headings) {
-    return people.map(function(personAsArray) {
+    return people.map(function (personAsArray) {
       let personAsObj = {};
 
-      headings.forEach(function(heading, i) {
+      headings.forEach(function (heading, i) {
         personAsObj[heading] = personAsArray[i];
       });
 
@@ -78,19 +81,16 @@ function jsonToSheetValues({ data, headers, direction }) {
   } else {
     arrayValues = mapObjectToArray(data);
   }
-  console.log("headers", headers);
   function mapObjectToArray(object) {
     let array = new Array(headers.length);
-    console.log("init array", array);
 
     let exluededKeys = ["_id"];
     for (let key in object) {
       if (!exluededKeys.includes(key)) {
-        headers.forEach(function(header, index) {
+        headers.forEach(function (header, index) {
           let normalizeKey = camelCaseToWords(String(key));
           if (normalizeKey === header) {
             array[index] = isVertical ? [object[key]] : object[key];
-            console.log("array", array);
           } else if (!array[index]) {
             array[index] = isVertical ? [""] : "";
           }
@@ -115,23 +115,3 @@ function getRawDataFromSheet(sheetName) {
 function stringify(data) {
   return JSON.stringify(data, false, false);
 }
-
-// String.prototype.addQuery = function(obj) {
-//     return this + Object.keys(obj).reduce(function(p, e, i) {
-//       return p + (i == 0 ? "?" : "&") +
-//         (Array.isArray(obj[e]) ? obj[e].reduce(function(str, f, j) {
-//           return str + e + "=" + encodeURIComponent(f) + (j != obj[e].length - 1 ? "&" : "")
-//         },"") : e + "=" + encodeURIComponent(obj[e]));
-//     },"");
-//   }
-
-//   function myFunction() {
-//     var url = "https://sampleUrl";
-//     var query = {
-//       query1: ["value1A", "value1B", "value1C"],
-//       query2: "value2A, value2B",
-//       query3: "value3A/value3B",
-//     };
-//     var endpoint = url.addQuery(query);
-//     Logger.log(endpoint);
-//   }

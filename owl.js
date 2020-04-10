@@ -60,9 +60,12 @@ function mapCellAction2Function(range) {
 function useOrder(rowValues) {
   var hasValues = rowValues.length > 1;
   if (hasValues) {
-    let latestOrders = API.getLatestOrders();
-    const order = latestOrders.find((o) => o.ordenCompra === rowValues[1]);
-    return fillOrderData(order);
+    let response = API.getLatestOrders();
+    if (response.ok) {
+      const order = response.data.find((o) => o.ordenCompra === rowValues[1]);
+      return fillOrderData(order);
+    }
+    return showResponseMessage(response);
   }
   return showErrorMessage(
     "Por favor selecciona un rango de las ultimas ordenes de compra no vacio para poder usarla."
@@ -79,8 +82,8 @@ function fillOrderData(order) {
     direction: "vertical",
   });
   range.setValues(orderValues);
-  const [cliente] = order.cliente;
-  fillClientData(cliente);
+  const [cliente] = order.cliente || [];
+  if (cliente) fillClientData(cliente);
 }
 function getOrderRange() {
   const headers = ACTIVE_SPREADSHEET.getRange("B47:B59")
@@ -112,19 +115,26 @@ function fillLatestOrders(orders) {
     .getValues()
     .map((row, i) => ((values[i] || []).length ? values[i] : row));
   tableRange.setValues(ordersValues);
-  showMessage("Ordenes cargadas exitosamente");
 }
 
 function getLastestOrders() {
-  const orders = API.getLatestOrders();
-  fillLatestOrders(orders);
+  const response = API.getLatestOrders();
+  showResponseMessage(response);
+  if (response.ok) fillLatestOrders(response.data);
 }
 
 function searchOrder() {
   var searchRange = ACTIVE_SPREADSHEET.getRange("B16:D16");
   var searchValues = searchRange.getValues()[0];
   var hasValues = !!searchValues.filter(notNull).length;
-  if (hasValues) return showMessage("Buscando...", searchValues.join());
+  if (hasValues) {
+    const response = API.searchOrder({
+      ordenCompra: searchValues[0],
+      proyecto: searchValues[1],
+      fechaCreacion: searchValues[2],
+    });
+    return showResponseMessage(response);
+  }
   return showErrorMessage("Por favor escribe algo para buscar");
 }
 
@@ -136,8 +146,13 @@ function deleteOrder() {
     sheetValues: [sheetValues],
   });
   console.log("order", order);
-  const result = API.deleteOrder(order);
-  console.log("result", stringify(result));
+  const response = API.deleteOrder({ ordenCompra: order.ordenCompra });
+  showResponseMessage(response);
+  if (response.ok) {
+    const emptyRange = range.getValues().map(() => [""]);
+    console.log("emptyRange", emptyRange);
+    range.setValues(emptyRange);
+  }
 }
 
 function updateOrCreateOrder() {
@@ -148,6 +163,13 @@ function updateOrCreateOrder() {
     sheetValues: [sheetValues],
   });
   console.log("order", order);
-  const result = API.updateOrCreateOrder(order);
-  console.log("result", stringify(result));
+  const response = API.updateOrCreateOrder(order);
+  showResponseMessage(response);
+}
+
+function showResponseMessage(response) {
+  if (!response) return;
+  console.log("response", stringify(response));
+  if (response.ok) showMessage("Exito", response.message);
+  else showErrorMessage(response.message);
 }

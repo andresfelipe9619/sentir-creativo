@@ -1,10 +1,26 @@
 exports = async function hook(payload) {
-  console.log("PAYLOAD ==>", stringify(payload));
-  const atlas = context.services.get("mongodb-atlas");
-  const eventsdb = atlas.db("stoner-cluster");
-  const mongoService = initMongoService(eventsdb);
-  const result = await handleAction(mongoService, payload.query);
-  return result;
+  try {
+    console.log("PAYLOAD ==>", stringify(payload));
+    const atlas = context.services.get("mongodb-atlas");
+    const eventsdb = atlas.db("stoner-cluster");
+    const mongoService = initMongoService(eventsdb);
+    const result = await handleAction(mongoService, payload.query);
+    return result;
+  } catch (error) {
+    console.log("error", error);
+    let errorResponse = {
+      ok: false,
+      message: "",
+    };
+    if (typeof error === "object") {
+      errorResponse.message = stringify(error);
+    } else if (typeof error === "string") {
+      errorResponse.message = error;
+    } else {
+      errorResponse.message =
+        "Húbo un error en el servidor, por favor prueba más tarde";
+    }
+  }
 };
 
 function stringify(data) {
@@ -16,7 +32,7 @@ async function handleAction(mongoService, { action, data, collection } = {}) {
   console.log("ACTION ==>", action);
   console.log("DATA ==>", stringify(data));
   console.log("COLLECTION ==>", collection);
-  let parsedData = JSON.parse(data);
+  let parsedData = data ? JSON.parse(data) : null;
   if (collection === "order") {
     result = await handleOrderAction(mongoService, {
       action,
@@ -35,11 +51,8 @@ async function handleAction(mongoService, { action, data, collection } = {}) {
 
 async function handleOrderAction(mongoService, { action, data }) {
   let result = null;
-  if (action === "read") {
-    result = await mongoService.getOrders();
-  }
   if (action === "search") {
-    result = await mongoService.searchOrder();
+    result = await mongoService.searchOrder(data);
   }
   if (action === "latest") {
     result = await mongoService.getLatestOrders();
@@ -58,10 +71,6 @@ async function handleOrderAction(mongoService, { action, data }) {
 
 async function handleClientAction(action, data) {
   let result = null;
-
-  if (action === "read") {
-    result = await mongoService.getOrders();
-  }
   if (action === "search") {
     result = await mongoService.searchOrder(data);
   }
@@ -87,27 +96,89 @@ function initMongoService(eventsdb) {
     return getOrders({ limit });
   }
 
-  function searchOrder(query) {
-    return findOneDocument(query);
+  async function searchOrder({ ordenCompra, proyecto, fechaCreacion }) {
+    const query = {
+      $or: [{ ordenCompra }, { proyecto }, { fechaCreacion }],
+    };
+    const response = await findOneDocument({ query, collection: "services" });
+    console.log("response", response);
+    let result = {
+      message:
+        "No hemos encontrado una orden que coincida con tus criterios de búsqueda",
+      ok: true,
+      data: null,
+    };
+    if (response) {
+      result.data = response;
+      result.message = `Hemos encontrado una orden: \n ${stringify(response)}`;
+    }
+    return result;
   }
 
   function getOrders(options) {
-    return findDocuments({ ...options, collection: "services" });
+    const lookup = {
+      from: "client",
+      localField: "clienteId",
+      foreignField: "_id",
+      as: "cliente",
+    };
+    const sort = { fechaCreacion: -1 };
+    const data = findDocuments({
+      ...options,
+      collection: "services",
+      lookup,
+      sort,
+    });
+    return { ok: true, data, message: "Ordenes cargadas exitosamente" };
   }
 
-  function deleteOrder({ id }) {
-    const { deletedCount } = deleteDocument({ collection: "services", id });
-    let result = { message: "Service deleted correctly", data: null };
-    if (!deletedCount) result.message = "Looks like the service does not exist";
+  async function deleteOrder({ ordenCompra }) {
+    const { deletedCount } = await deleteDocument({
+      collection: "services",
+      ordenCompra,
+    });
+    let result = {
+      message: "Parece que la orden no existe",
+      ok: false,
+      data: null,
+    };
+    if (deletedCount) {
+      result.ok = true;
+      result.message = "Orden borrada correctamente";
+    }
     return result;
   }
 
   function createOrder(options) {
-    return createDocument({ ...options, collection: "services" });
+    let result = {
+      ok: false,
+      data: null,
+      message: "La orden no se pudo crear",
+    };
+    let resultId = createDocument({ ...options, collection: "services" });
+    if (resultId) {
+      result.ok = true;
+      result.message = "Orden creada correctamente";
+    }
+    return result;
   }
 
-  function updateOrder(options) {
-    return updateDocument({ ...options, collection: "services" });
+  async function updateOrder(options) {
+    let response = await updateDocument({
+      ...options,
+      collection: "services",
+    });
+    console.log("response", stringify(response));
+    let result = {
+      ok: false,
+      data: null,
+      message: "Hubo un problema actualizando la orden",
+    };
+    if (response.modifiedCount) {
+      result.ok = true;
+      result.message = "Orden actualizada correctamente";
+    }
+    return result;
   }
 
   // ============== Fin Servicios ==============
@@ -125,37 +196,42 @@ function initMongoService(eventsdb) {
     return collectionService.findOne(query);
   }
 
-  function findDocuments({ collection, query = {}, limit }) {
+  function findDocuments({
+    collection,
+    query = {},
+    sort = {},
+    limit = 20,
+    lookup,
+  }) {
     const collectionService = eventsdb.collection(collection);
+    if (!lookup) {
+      return collectionService.find(query).sort(sort).limit(limit).toArray();
+    }
     return collectionService
       .aggregate([
         {
-          $lookup: {
-            from: "client",
-            localField: "clienteId",
-            foreignField: "_id",
-            as: "cliente",
-          },
+          $lookup: lookup,
         },
-        { $limit: limit || 20 },
+        { $sort: sort },
+        { $limit: limit },
       ])
       .toArray();
   }
 
   function updateDocument({ collection, ordenCompra, ...props }) {
-    console.log(
-      "{collection, ordenCompra}",
-      stringify({ collection, ordenCompra })
-    );
     const collectionService = eventsdb.collection(collection);
-    return collectionService.updateOne({ ordenCompra }, props, {
-      upsert: true,
-    });
+    return collectionService.updateOne(
+      { ordenCompra },
+      { $set: props, $setOnInsert: { fechaCreacion: new Date() } },
+      {
+        upsert: true,
+      }
+    );
   }
 
-  function deleteDocument({ collection, id }) {
+  function deleteDocument({ collection, ordenCompra }) {
     const collectionService = eventsdb.collection(collection);
-    return collectionService.deleteOne({ _id: { $oid: id } });
+    return collectionService.deleteOne({ ordenCompra });
   }
 
   // ============== Fin CRUD generico ==============

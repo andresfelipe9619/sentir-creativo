@@ -1,6 +1,7 @@
 const API = {
-  getOrders() {},
-  searchOrder() {},
+  searchOrder(data) {
+    return fetchWebHook({ collection: "order", action: "search", data });
+  },
   getLatestOrders() {
     return fetchWebHook({ collection: "order", action: "latest" });
   },
@@ -10,8 +11,8 @@ const API = {
   updateOrCreateOrder(data) {
     return fetchWebHook({ collection: "order", action: "update", data });
   },
-  deleteOrder() {
-    return fetchWebHook({ collection: "order", action: "delete" });
+  deleteOrder(data) {
+    return fetchWebHook({ collection: "order", action: "delete", data });
   },
   createClient(data) {
     return fetchWebHook({ collection: "client", action: "create", data });
@@ -34,7 +35,7 @@ function fetchWebHook({ data, action, collection }) {
   const query = {
     action,
     collection,
-    data: JSON.stringify(data),
+    data: data ? JSON.stringify(data) : null,
   };
   const url2Fetch = addQuery({ url: WEB_HOOK_URL, query });
   const response = UrlFetchApp.fetch(url2Fetch, params);

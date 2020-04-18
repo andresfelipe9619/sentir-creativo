@@ -60,11 +60,11 @@ function sheetValuesToObject({ sheetValues, headers }) {
   console.log("headings", headings);
   let peopleWithHeadings = addHeadings(sheetValues, headings);
   function addHeadings(people, headings) {
-    return people.map(function (personAsArray) {
+    return people.map((personAsArray) => {
       let personAsObj = {};
 
-      headings.forEach(function (heading, i) {
-        personAsObj[heading] = personAsArray[i];
+      headings.forEach((heading, i) => {
+        if (heading) personAsObj[heading] = personAsArray[i];
       });
 
       return personAsObj;
@@ -84,18 +84,22 @@ function jsonToSheetValues({ data, headers, direction }) {
   function mapObjectToArray(object) {
     let array = new Array(headers.length);
 
-    let exluededKeys = ["_id"];
     for (let key in object) {
-      if (!exluededKeys.includes(key)) {
-        headers.forEach(function (header, index) {
-          let normalizeKey = camelCaseToWords(String(key));
-          if (normalizeKey === header) {
-            array[index] = isVertical ? [object[key]] : object[key];
-          } else if (!array[index]) {
-            array[index] = isVertical ? [""] : "";
+      key = String(key);
+      console.log("key", key);
+      headers.forEach(function (header, index) {
+        let normalizeKey = key === "_id" ? key : camelCaseToWords(key);
+        console.log("{normalizeKey, header}", { normalizeKey, header });
+        if (normalizeKey === header) {
+          let value = object[key];
+          if ((object[key] || {}).$date) {
+            value = new Date(object[key].$date.$numberLong);
           }
-        });
-      }
+          array[index] = isVertical ? [value] : value;
+        } else if (!array[index]) {
+          array[index] = isVertical ? [""] : "";
+        }
+      });
     }
     return array;
   }

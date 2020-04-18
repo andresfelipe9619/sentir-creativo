@@ -20,8 +20,8 @@ const API = {
   updateOrCreateClient(data) {
     return fetchWebHook({ collection: "client", action: "update", data });
   },
-  deleteClient() {
-    return fetchWebHook({ collection: "client", action: "delete" });
+  deleteClient(data) {
+    return fetchWebHook({ collection: "client", action: "delete", data });
   },
 };
 
@@ -47,25 +47,34 @@ function fetchWebHook({ data, action, collection }) {
   }
 }
 
+//Funcion que que recibe laa respusta de "Stitch"
+// y basado en ella muestra una alerta de exito o error.
+function showResponseMessage(response) {
+  if (!response) return;
+  console.log("response", stringify(response));
+  if (response.ok) showMessage("Exito", response.message);
+  else showErrorMessage(response.message);
+}
+
 function addQuery({ url, query }) {
   return (
     url +
-    Object.keys(query).reduce(function (p, e, i) {
-      return (
+    Object.keys(query).reduce(
+      (p, e, i) =>
         p +
         (i == 0 ? "?" : "&") +
         (Array.isArray(query[e])
-          ? query[e].reduce(function (str, f, j) {
-              return (
+          ? query[e].reduce(
+              (str, f, j) =>
                 str +
                 e +
                 "=" +
                 encodeURIComponent(f) +
-                (j != query[e].length - 1 ? "&" : "")
-              );
-            }, "")
-          : e + "=" + encodeURIComponent(query[e]))
-      );
-    }, "")
+                (j != query[e].length - 1 ? "&" : ""),
+              ""
+            )
+          : e + "=" + encodeURIComponent(query[e])),
+      ""
+    )
   );
 }

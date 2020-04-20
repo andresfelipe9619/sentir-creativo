@@ -1,15 +1,21 @@
-function fillClientData(client) {
+function fillClientData(client, clientOrders = []) {
   if (!client) return showErrorMessage("No se pudo cargar cliente");
-  const headers = ACTIVE_SPREADSHEET.getRange("B23:B33")
-    .getValues()
-    .flatMap((v) => v);
-  let clientValues = jsonToSheetValues({
+  console.log("Filling client data", client);
+  cleanClientData();
+  const { headers, range } = getClientRange();
+  let values = jsonToSheetValues({
     data: client,
     headers,
     direction: "vertical",
   });
-  console.log("clientValues", clientValues);
-  ACTIVE_SPREADSHEET.getRange("C23:C33").setValues(clientValues);
+  console.log("values", values);
+  const clientValues = range
+    .getValues()
+    //Completa con filas vacias si el numero de atributos es menor al rango en la hoja
+    .map((row, i) => ((values[i] || []).length ? values[i] : row));
+
+  range.setValues(clientValues);
+  if (clientOrders.length) fillLatestOrdersFromClients(clientOrders);
 }
 
 function getClientRange() {
@@ -20,14 +26,30 @@ function getClientRange() {
   return { headers, range };
 }
 
+function getClientOrdersRange() {
+  const [headers] = ACTIVE_SPREADSHEET.getRange("B37:D37").getValues();
+  const range = ACTIVE_SPREADSHEET.getRange("B38:D41");
+  return { headers, range };
+}
+
 function fillLatestOrdersFromClients(orders) {
-  const [headers] = ACTIVE_SPREADSHEET.getRange("B7:D7").getValues();
+  const { headers, range } = getClientOrdersRange();
   const values = jsonToSheetValues({ data: orders, headers });
-  const tableRange = ACTIVE_SPREADSHEET.getRange("B8:D11");
-  const ordersValues = tableRange
+  const clientValues = range
     .getValues()
     .map((row, i) => ((values[i] || []).length ? values[i] : row));
-  tableRange.setValues(ordersValues);
+  range.setValues(clientValues);
+}
+
+function cleanClientData() {
+  const { range } = getClientRange();
+  const emptyRange = range.getValues().map(() => [""]);
+  console.log("emptyRange", emptyRange);
+  range.setValues(emptyRange);
+  const { range: ordersRange } = getClientOrdersRange();
+  const ordersEmptyRange = ordersRange.getValues().map(() => ["", "", ""]);
+  console.log("ordersEmptyRange", ordersEmptyRange);
+  ordersRange.setValues(ordersEmptyRange);
 }
 
 function deleteClient() {
@@ -37,17 +59,10 @@ function deleteClient() {
     headers,
     sheetValues: [sheetValues],
   });
-  let clientId = client.clientId;
-  delete client.clientId;
-  client = { _id: clientId, ...client };
   console.log("client", client);
   const response = API.deleteClient({ _id: client._id });
   showResponseMessage(response);
-  if (response.ok) {
-    const emptyRange = range.getValues().map(() => [""]);
-    console.log("emptyRange", emptyRange);
-    range.setValues(emptyRange);
-  }
+  if (response.ok) cleanClientData();
 }
 
 function updateOrCreateClient() {
@@ -57,9 +72,6 @@ function updateOrCreateClient() {
     headers,
     sheetValues: [sheetValues],
   });
-  let clientId = client.clientId;
-  delete client.clientId;
-  client = { _id: clientId, ...client };
   console.log("client", client);
   const response = API.updateOrCreateClient(client);
   showResponseMessage(response);

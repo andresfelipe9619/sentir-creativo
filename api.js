@@ -11,6 +11,9 @@ const API = {
   updateOrCreateOrder(data) {
     return fetchWebHook({ collection: "order", action: "update", data });
   },
+  updateOrderFinances(data) {
+    return fetchWebHook({ collection: "order", action: "finances", data });
+  },
   deleteOrder(data) {
     return fetchWebHook({ collection: "order", action: "delete", data });
   },

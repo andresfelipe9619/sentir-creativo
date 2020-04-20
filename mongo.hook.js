@@ -60,6 +60,9 @@ async function handleOrderAction(mongoService, { action, data }) {
   if (action === "latest") {
     result = await mongoService.getLatestOrders();
   }
+  if (action === "finances") {
+    result = await mongoService.updateOrderFinances(data);
+  }
   if (action === "update") {
     //Usamos update para actualizar o crear un documento
     result = await mongoService.updateOrder(data);
@@ -94,17 +97,20 @@ function initMongoService(eventsdb) {
     const query = {
       $or: [{ _id }, { proyecto }, { fechaCreacion }],
     };
-    const response = await findOneDocument({ query, collection: "order" });
-    console.log("response", response);
+    const limit = 1;
+    const response = await getOrders({ limit, query });
     let result = {
       message:
         "No hemos encontrado una orden que coincida con tus criterios de búsqueda",
       ok: true,
       data: null,
     };
-    if (response) {
-      result.data = response;
-      result.message = `Hemos encontrado una orden: \n ${stringify(response)}`;
+    if (response && response.data) {
+      let [orderFound] = response.data;
+      result.data = orderFound;
+      result.message = `Hemos encontrado una orden: ${orderFound._id} - ${
+        orderFound.proyecto || ""
+      }`;
     }
     return result;
   }
@@ -112,11 +118,10 @@ function initMongoService(eventsdb) {
   async function getOrders(options) {
     const lookup = {
       from: "client",
-      localField: "clienteId",
+      localField: "clientId",
       foreignField: "_id",
-      as: "cliente",
+      as: "client",
     };
-    //https://stackoverflow.com/questions/36019713/mongodb-nested-lookup-with-3-levels
     const aggregate = [
       {
         $unwind: { path: "$client", preserveNullAndEmptyArrays: true },
@@ -125,7 +130,7 @@ function initMongoService(eventsdb) {
         $lookup: {
           from: "order",
           localField: "client._id",
-          foreignField: "clienteId",
+          foreignField: "clientId",
           as: "clientOrders",
         },
       },
@@ -154,6 +159,26 @@ function initMongoService(eventsdb) {
     if (deletedCount) {
       result.ok = true;
       result.message = "Orden borrada correctamente";
+    }
+    return result;
+  }
+
+  async function updateOrderFinances(options) {
+    let response = await updateDocument({
+      ...options,
+      upsert: false,
+      collection: "order",
+    });
+    console.log("response", stringify(response));
+    let result = {
+      ok: false,
+      data: null,
+      message: "Hubo un problema actualizando la informacion financiera.",
+    };
+    const { modifiedCount } = response;
+    if (modifiedCount) {
+      result.ok = true;
+      result.message = `Informacion financiera actualizada correctamente.`;
     }
     return result;
   }
@@ -256,7 +281,13 @@ function initMongoService(eventsdb) {
       .toArray();
   }
 
-  async function updateDocument({ collection, _id, idPrefix, ...props }) {
+  async function updateDocument({
+    collection,
+    _id,
+    idPrefix,
+    upsert = true,
+    ...props
+  }) {
     const collectionService = eventsdb.collection(collection);
     const sequenceName = `${collection}Id`;
     let id = _id || `${idPrefix}${await getNextSequenceValue(sequenceName)}`;
@@ -269,7 +300,7 @@ function initMongoService(eventsdb) {
         },
       },
       {
-        upsert: true,
+        upsert,
       }
     );
   }
@@ -299,5 +330,6 @@ function initMongoService(eventsdb) {
     updateClient,
     deleteClient,
     getLatestOrders,
+    updateOrderFinances,
   };
 }

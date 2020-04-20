@@ -1,9 +1,10 @@
 function useOrder(rowValues) {
+  console.log("rowValues", rowValues);
   var hasValues = rowValues.length > 1;
   if (hasValues) {
-    let response = API.getLatestOrders();
+    let response = API.searchOrder({ _id: rowValues[1] });
     if (response.ok) {
-      const order = response.data.find((o) => o._id === rowValues[1]);
+      const order = response.data;
       return fillOrderData(order);
     }
     return showResponseMessage(response);
@@ -14,7 +15,7 @@ function useOrder(rowValues) {
 }
 
 function fillOrderData(order) {
-  console.log("order", order);
+  console.log("Filling order data", order);
   if (!order) return showErrorMessage("No se pudo cargar orden");
   showMessage("Campo seleccionado", order._id);
   const { headers, range } = getOrderRange();
@@ -24,8 +25,15 @@ function fillOrderData(order) {
     direction: "vertical",
   });
   range.setValues(orderValues);
-  // const [cliente] = order.cliente || [];
-  // if (cliente) fillClientData(cliente);
+  const { headers: financeHeaders, range: financeRange } = getFinanceRange();
+  let financeValues = jsonToSheetValues({
+    data: order,
+    headers: financeHeaders,
+    direction: "vertical",
+  });
+  financeRange.setValues(financeValues);
+  const { client } = order;
+  if (client) fillClientData(client, order.clientOrders);
 }
 
 function getOrderRange() {
@@ -41,7 +49,8 @@ function getFinanceRange() {
     .getValues()
     .flatMap((v) => v);
   const range = ACTIVE_SPREADSHEET.getRange("C70:C81");
-  return { headers, range };
+  const assignRange = ACTIVE_SPREADSHEET.getRange("H70:H81");
+  return { headers, range, assignRange };
 }
 
 function fillLatestOrders(orders) {
@@ -111,12 +120,14 @@ function updateOrCreateOrder() {
 
 function updateOrderFinances() {
   const orderId = ACTIVE_SPREADSHEET.getRange("C53").getValue();
-  const { headers, range } = getFinanceRange();
-  const sheetValues = range.getValues().flatMap((v) => v);
+  const { headers, range, assignRange } = getFinanceRange();
+  const sheetValues = assignRange.getValues();
+  const flatedValues = sheetValues.flatMap((v) => v);
   const [order] = sheetValuesToObject({
     headers,
-    sheetValues: [sheetValues],
+    sheetValues: [flatedValues],
   });
-  const response = API.updateOrCreateOrder({ _id: orderId, ...order });
+  const response = API.updateOrderFinances({ _id: orderId, ...order });
   showResponseMessage(response);
+  if (response.ok) range.setValues(sheetValues);
 }

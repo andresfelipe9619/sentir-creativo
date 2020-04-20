@@ -54,7 +54,7 @@ function mapCellAction2Function(range) {
     }
   }
   //Click on finance actions
-  if (row === 67) {
+  if (row === 83) {
     if (actionName.includes("actualizar")) {
       action = updateOrderFinances;
     }

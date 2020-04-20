@@ -86,10 +86,8 @@ function jsonToSheetValues({ data, headers, direction }) {
 
     for (let key in object) {
       key = String(key);
-      console.log("key", key);
       headers.forEach(function (header, index) {
         let normalizeKey = key === "_id" ? key : camelCaseToWords(key);
-        console.log("{normalizeKey, header}", { normalizeKey, header });
         if (normalizeKey === header) {
           let value = object[key];
           if ((object[key] || {}).$date) {

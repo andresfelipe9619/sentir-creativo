@@ -94,9 +94,25 @@ function initMongoService(eventsdb) {
   }
 
   async function searchOrder({ _id, proyecto, fechaCreacion }) {
-    const query = {
-      $or: [{ _id }, { proyecto }, { fechaCreacion }],
-    };
+    console.log(
+      "{_id, proyecto, fechaCreacion}",
+      stringify({
+        _id,
+        proyecto,
+        fechaCreacion,
+      })
+    );
+    let or = [];
+    if (_id) or.push({ _id });
+    if (proyecto) or.push({ proyecto });
+    if (fechaCreacion) or.push({ fechaCreacion });
+    console.log("or", stringify(or));
+    const query =
+      or.length > 1
+        ? {
+            $or: or,
+          }
+        : or[0];
     const limit = 1;
     const response = await getOrders({ limit, query });
     let result = {
@@ -271,6 +287,9 @@ function initMongoService(eventsdb) {
     }
     return collectionService
       .aggregate([
+        {
+          $match: query,
+        },
         {
           $lookup: lookup,
         },

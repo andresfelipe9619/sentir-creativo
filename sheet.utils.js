@@ -93,6 +93,9 @@ function jsonToSheetValues({ data, headers, direction }) {
           if ((object[key] || {}).$date) {
             value = new Date(object[key].$date.$numberLong);
           }
+          if ((object[key] || {}).$numberDouble) {
+            value = +parseFloat(object[key].$numberDouble).toFixed(2);
+          }
           array[index] = isVertical ? [value] : value;
         } else if (!array[index]) {
           array[index] = isVertical ? [""] : "";

@@ -64,13 +64,24 @@ function sheetValuesToObject({ sheetValues, headers }) {
       let personAsObj = {};
 
       headings.forEach((heading, i) => {
-        if (heading) personAsObj[heading] = personAsArray[i];
+        if (heading) {
+          let value = personAsArray[i];
+          if (isDate(value)) value = new Date(value);
+          personAsObj[heading] = value;
+        }
       });
 
       return personAsObj;
     });
   }
   return peopleWithHeadings;
+}
+
+function isDate(s) {
+  if (isNaN(s) && !isNaN(Date.parse(s))) {
+    return true;
+  }
+  return false;
 }
 
 function jsonToSheetValues({ data, headers, direction }) {
@@ -91,7 +102,7 @@ function jsonToSheetValues({ data, headers, direction }) {
         if (normalizeKey === header) {
           let value = object[key];
           if ((object[key] || {}).$date) {
-            value = new Date(object[key].$date.$numberLong);
+            value = new Date(+object[key].$date.$numberLong);
           }
           if ((object[key] || {}).$numberDouble) {
             value = +parseFloat(object[key].$numberDouble).toFixed(2);

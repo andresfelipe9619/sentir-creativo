@@ -29,6 +29,13 @@ function stringify(data) {
   return JSON.stringify(data, false, false);
 }
 
+function isDate(s) {
+  if (isNaN(s) && !isNaN(Date.parse(s))) {
+    return true;
+  }
+  return false;
+}
+
 async function handleAction(mongoService, { action, data, collection } = {}) {
   let result = { data: null, message: "Could not execute action" };
   console.log("ACTION ==>", action);
@@ -214,7 +221,7 @@ function initMongoService(eventsdb) {
     const { upsertedId, modifiedCount } = response;
     if (modifiedCount || upsertedId) {
       result.ok = true;
-      result.data = { upsertedId };
+      result.data = upsertedId ? { upsertedId } : null;
       result.message = `Orden ${
         response.upsertedId ? "creada" : "actualizada"
       } correctamente`;
@@ -256,7 +263,7 @@ function initMongoService(eventsdb) {
     const { upsertedId, modifiedCount } = response;
     if (modifiedCount || upsertedId) {
       result.ok = true;
-      result.data = { upsertedId };
+      result.data = upsertedId ? { upsertedId } : null;
       result.message = `Cliente ${
         response.upsertedId ? "creado" : "actualizado"
       } correctamente`;
@@ -310,10 +317,16 @@ function initMongoService(eventsdb) {
     const collectionService = eventsdb.collection(collection);
     const sequenceName = `${collection}Id`;
     let id = _id || `${idPrefix}${await getNextSequenceValue(sequenceName)}`;
+    let propsToSet = Object.keys(props).reduce((acc, prop) => {
+      let keyValue = props[prop];
+      let value2set = isDate(keyValue) ? new Date(keyValue) : keyValue;
+      acc[prop] = value2set;
+      return acc;
+    }, {});
     return collectionService.updateOne(
       { _id: id },
       {
-        $set: props,
+        $set: propsToSet,
         $setOnInsert: {
           fechaCreacion: new Date(),
         },

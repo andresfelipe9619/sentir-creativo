@@ -62,7 +62,7 @@ function mapCellAction2Function(range) {
   try {
     showAlert({ title, onAccepted: action });
   } catch (error) {
-    console.log("OWL ERROR: ", error);
-    showErrorMessage(stringify(error));
+    console.log("GAS OWL ERROR: ", error);
+    showErrorMessage(error);
   }
 }

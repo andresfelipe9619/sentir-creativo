@@ -27,8 +27,8 @@ function getClientRange() {
 }
 
 function getClientOrdersRange() {
-  const [headers] = ACTIVE_SPREADSHEET.getRange("B37:D37").getValues();
-  const range = ACTIVE_SPREADSHEET.getRange("B38:D41");
+  const [headers] = ACTIVE_SPREADSHEET.getRange("B38:D38").getValues();
+  const range = ACTIVE_SPREADSHEET.getRange("B39:D42");
   return { headers, range };
 }
 

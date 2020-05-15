@@ -17,8 +17,8 @@ function checkEditedCell(range) {
 function mapCellAction2Function(range) {
   const row = +range.getRow();
   const column = +range.getColumn();
-  const isChecked = !!range.getValue();
-  console.log("MAPPING", { row, column, isChecked });
+  const isChecked = range.getValue() === true;
+  console.log("MAPPING", { row, column, isChecked, value: range.getValue() });
   const allowedCols = [5, 7];
   if (!isChecked || !allowedCols.includes(column)) return;
   let title = "";
@@ -38,7 +38,7 @@ function mapCellAction2Function(range) {
     if (column === 7) action = () => useOrder(rowValues);
   }
   //Click on client actions
-  if (row === 48) {
+  if (row === 50) {
     if (actionName.includes("crear")) {
       action = updateOrCreateClient;
     } else if (actionName.includes("borrar")) {
@@ -46,7 +46,7 @@ function mapCellAction2Function(range) {
     }
   }
   //Click on order actions
-  if (row === 66) {
+  if (row === 70) {
     if (actionName.includes("crear")) {
       action = updateOrCreateOrder;
     } else if (actionName.includes("borrar")) {
@@ -54,7 +54,7 @@ function mapCellAction2Function(range) {
     }
   }
   //Click on finance actions
-  if (row === 83) {
+  if (row === 87) {
     if (actionName.includes("actualizar")) {
       action = updateOrderFinances;
     }

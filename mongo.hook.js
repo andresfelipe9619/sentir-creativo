@@ -94,6 +94,8 @@ async function handleClientAction(mongoService, { action, data }) {
 }
 
 function initMongoService(eventsdb) {
+  // eventsdb.collection("client").createIndex({ email: 1 }, { unique: true });
+
   // ============== Servicios para ordenes ==============
   function getLatestOrders() {
     const limit = 4;
@@ -249,8 +251,17 @@ function initMongoService(eventsdb) {
   }
 
   async function updateClient(options) {
+    let foundClient = null;
+    if (!options._id && options.email) {
+      foundClient = await findOneDocument({
+        query: { email: options.email },
+        collection: "client",
+      });
+    }
+    console.log("foundClient", stringify(foundClient));
     let response = await updateDocument({
       ...options,
+      _id: foundClient ? foundClient._id : options._id,
       idPrefix: "CL",
       collection: "client",
     });
@@ -260,10 +271,14 @@ function initMongoService(eventsdb) {
       data: null,
       message: "Hubo un problema actualizando el cliente",
     };
-    const { upsertedId, modifiedCount } = response;
-    if (modifiedCount || upsertedId) {
+    const { upsertedId, modifiedCount, matchedCount } = response;
+    if (modifiedCount || upsertedId || (foundClient && matchedCount)) {
       result.ok = true;
-      result.data = upsertedId ? { upsertedId } : null;
+      result.data = upsertedId
+        ? { upsertedId }
+        : foundClient
+        ? { upsertedId: foundClient._id }
+        : null;
       result.message = `Cliente ${
         response.upsertedId ? "creado" : "actualizado"
       } correctamente`;
@@ -323,8 +338,10 @@ function initMongoService(eventsdb) {
       acc[prop] = value2set;
       return acc;
     }, {});
+    let query = {};
+    if (id) query._id = id;
     return collectionService.updateOne(
-      { _id: id },
+      query,
       {
         $set: propsToSet,
         $setOnInsert: {

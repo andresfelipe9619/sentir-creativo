@@ -2,7 +2,11 @@ function useOrder(rowValues) {
   console.log("rowValues", rowValues);
   var hasValues = rowValues.length > 1;
   if (hasValues) {
-    let response = API.searchOrder({ _id: rowValues[1] });
+    let response = API.searchOrder({
+      _id: rowValues[1],
+      proyecto: rowValues[2],
+      fechaCreacion: rowValues[3],
+    });
     if (response.ok) {
       const order = response.data;
       return fillOrderData(order);
@@ -45,19 +49,59 @@ function getOrderRange() {
 }
 
 function getFinanceRange() {
-  const headers = ACTIVE_SPREADSHEET.getRange("B70:B81")
+  const headers = ACTIVE_SPREADSHEET.getRange("B74:B85")
     .getValues()
     .flatMap((v) => v);
-  const range = ACTIVE_SPREADSHEET.getRange("C70:C81");
-  const assignRange = ACTIVE_SPREADSHEET.getRange("H70:H81");
+  const range = ACTIVE_SPREADSHEET.getRange("C74:C85");
+  const assignRange = ACTIVE_SPREADSHEET.getRange("H74:H85");
   return { headers, range, assignRange };
 }
 
+function getOrderIdRange() {
+  return ACTIVE_SPREADSHEET.getRange("C55");
+}
+
+function getCurrentOrder() {
+  const { headers, range } = getOrderRange();
+  const sheetValues = range.getValues().flatMap((v) => v);
+  const [order] = sheetValuesToObject({
+    headers,
+    sheetValues: [sheetValues],
+  });
+  console.log("order", order);
+  return { order, range };
+}
+
+function getCurrentOrderFinances() {
+  const { headers, range, assignRange } = getFinanceRange();
+  const sheetValues = assignRange.getValues();
+  const flatedValues = sheetValues.flatMap((v) => v);
+  const [order] = sheetValuesToObject({
+    headers,
+    sheetValues: [flatedValues],
+  });
+  return { order, range };
+}
+
+function cleanOrderData() {
+  const { range } = getCurrentOrder();
+  const { range: financeRange } = getFinanceRange();
+  const emptyRange = range.getValues().map(sheetValue2Empty());
+  const emptyFianceRange = financeRange.getValues().map(sheetValue2Empty());
+  range.setValues(emptyRange);
+  financeRange.setValues(emptyFianceRange);
+}
+
+const sheetValue2Empty = (cols = 1) => () => new Array(cols).map(() => "");
+
 function fillLatestOrders(orders) {
+  console.log("Filling Latest Orders ...");
   const [headers] = ACTIVE_SPREADSHEET.getRange("B7:D7").getValues();
   const values = jsonToSheetValues({ data: orders, headers });
-  console.log("values", values);
   const tableRange = ACTIVE_SPREADSHEET.getRange("B8:D11");
+  const emptyRange = tableRange.getValues().map(sheetValue2Empty(3));
+  tableRange.setValues(emptyRange);
+
   const ordersValues = tableRange
     .getValues()
     //Completa con filas vacias si el numero de ordenes es menor al rango en la hoja
@@ -72,61 +116,38 @@ function getLastestOrders() {
 }
 
 function searchOrder() {
-  var searchRange = ACTIVE_SPREADSHEET.getRange("B16:D16");
-  var searchValues = searchRange.getValues()[0];
-  var hasValues = !!searchValues.filter(notNull).length;
-  if (hasValues) {
-    const response = API.searchOrder({
-      _id: searchValues[0],
-      proyecto: searchValues[1],
-      fechaCreacion: searchValues[2],
-    });
-    return showResponseMessage(response);
-  }
-  return showErrorMessage("Por favor escribe algo para buscar");
+  const searchRange = ACTIVE_SPREADSHEET.getRange("B17:D17");
+  const searchValues = searchRange.getValues()[0];
+  const hasValues = !!searchValues.filter(notNull).length;
+  if (!hasValues) return showErrorMessage("Por favor escribe algo para buscar");
+
+  const response = API.searchOrder({
+    _id: searchValues[0],
+    proyecto: searchValues[1],
+    fechaCreacion: searchValues[2],
+  });
+  return showResponseMessage(response);
 }
 
 function deleteOrder() {
-  const { headers, range } = getOrderRange();
-  const sheetValues = range.getValues().flatMap((v) => v);
-  const [order] = sheetValuesToObject({
-    headers,
-    sheetValues: [sheetValues],
-  });
-  console.log("order", order);
+  const { order } = getCurrentOrder();
   const response = API.deleteOrder({ _id: order._id });
   showResponseMessage(response);
-  if (response.ok) {
-    const emptyRange = range.getValues().map(() => [""]);
-    console.log("emptyRange", emptyRange);
-    range.setValues(emptyRange);
-  }
+  if (response.ok) cleanOrderData();
 }
 
 function updateOrCreateOrder() {
-  const { headers, range } = getOrderRange();
-  const sheetValues = range.getValues().flatMap((v) => v);
-  const [order] = sheetValuesToObject({
-    headers,
-    sheetValues: [sheetValues],
-  });
-  console.log("order", order);
+  const { order } = getCurrentOrder();
   const response = API.updateOrCreateOrder(order);
   showResponseMessage(response);
   if ((response.data || {}).upsertedId) {
-    ACTIVE_SPREADSHEET.getRange("C53").setValue(response.data.upsertedId);
+    getOrderIdRange().setValue(response.data.upsertedId);
   }
 }
 
 function updateOrderFinances() {
-  const orderId = ACTIVE_SPREADSHEET.getRange("C53").getValue();
-  const { headers, range, assignRange } = getFinanceRange();
-  const sheetValues = assignRange.getValues();
-  const flatedValues = sheetValues.flatMap((v) => v);
-  const [order] = sheetValuesToObject({
-    headers,
-    sheetValues: [flatedValues],
-  });
+  const orderId = getOrderIdRange().getValue();
+  const { order, range } = getCurrentOrderFinances();
   const response = API.updateOrderFinances({ _id: orderId, ...order });
   showResponseMessage(response);
   if (response.ok) range.setValues(sheetValues);

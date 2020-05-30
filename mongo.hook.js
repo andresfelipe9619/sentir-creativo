@@ -112,9 +112,14 @@ function initMongoService(eventsdb) {
       })
     );
     let or = [];
+    let sort = null;
     if (_id) or.push({ _id });
-    if (proyecto) or.push({ proyecto });
-    if (fechaCreacion) or.push({ fechaCreacion });
+    if (proyecto) or.push({ proyecto: { $regex: proyecto, $options: "i" } });
+    if (fechaCreacion) {
+      let date = new Date(fechaCreacion);
+      sort = { fechaCreacion: 1 };
+      or.push({ fechaCreacion: { $gte: date, $lt: date } });
+    }
     console.log("or", stringify(or));
     const query =
       or.length > 1
@@ -123,19 +128,23 @@ function initMongoService(eventsdb) {
           }
         : or[0];
     const limit = 1;
-    const response = await getOrders({ limit, query });
+    const response = await getOrders({ limit, query, sort });
     let result = {
       message:
         "No hemos encontrado una orden que coincida con tus criterios de búsqueda",
-      ok: true,
+      ok: false,
       data: null,
     };
     if (response && response.data) {
+      console.log("SEARCH Response", stringify(response));
       let [orderFound] = response.data;
       result.data = orderFound;
-      result.message = `Hemos encontrado una orden: ${orderFound._id} - ${
-        orderFound.proyecto || ""
-      }`;
+      if (orderFound) {
+        result.ok = true;
+        result.message = `Hemos encontrado una orden: ${orderFound._id} - ${
+          orderFound.proyecto || ""
+        }`;
+      }
     }
     return result;
   }
@@ -160,7 +169,7 @@ function initMongoService(eventsdb) {
         },
       },
     ];
-    const sort = { fechaCreacion: -1 };
+    const sort = options.sort ? options.sort : { fechaCreacion: -1 };
     const data = await findDocuments({
       ...options,
       collection: "order",

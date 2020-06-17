@@ -80,7 +80,7 @@ function getCurrentOrderFinances() {
     headers,
     sheetValues: [flatedValues],
   });
-  return { order, range };
+  return { order, range, sheetValues };
 }
 
 function cleanOrderData() {
@@ -147,7 +147,7 @@ function updateOrCreateOrder() {
 
 function updateOrderFinances() {
   const orderId = getOrderIdRange().getValue();
-  const { order, range } = getCurrentOrderFinances();
+  const { order, range, sheetValues } = getCurrentOrderFinances();
   const response = API.updateOrderFinances({ _id: orderId, ...order });
   showResponseMessage(response);
   if (response.ok) range.setValues(sheetValues);

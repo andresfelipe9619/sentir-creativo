@@ -116,9 +116,16 @@ function initMongoService(eventsdb) {
     if (_id) or.push({ _id });
     if (proyecto) or.push({ proyecto: { $regex: proyecto, $options: "i" } });
     if (fechaCreacion) {
-      let date = new Date(fechaCreacion);
-      sort = { fechaCreacion: 1 };
-      or.push({ fechaCreacion: { $gte: date, $lt: date } });
+      let creationDate = new Date(fechaCreacion);
+      let day = creationDate.getDate();
+      let month = creationDate.getMonth();
+      let year = creationDate.getFullYear();
+      let startDate = new Date(year, month, day);
+      startDate.setHours(0, 0, 0, 0);
+      let endDate = new Date(year, month, day);
+      endDate.setHours(23, 59, 59, 999);
+      // sort = { fechaCreacion: 1 };
+      or.push({ fechaCreacion: { $gte: startDate, $lt: endDate } });
     }
     console.log("or", stringify(or));
     const query =
@@ -207,12 +214,12 @@ function initMongoService(eventsdb) {
     let result = {
       ok: false,
       data: null,
-      message: "Hubo un problema actualizando la informacion financiera.",
+      message: "Hubo un problema actualizando la información financiera.",
     };
-    const { modifiedCount } = response;
-    if (modifiedCount) {
+    const { modifiedCount, matchedCount } = response;
+    if (modifiedCount || matchedCount) {
       result.ok = true;
-      result.message = `Informacion financiera actualizada correctamente.`;
+      result.message = `información financiera actualizada correctamente.`;
     }
     return result;
   }
